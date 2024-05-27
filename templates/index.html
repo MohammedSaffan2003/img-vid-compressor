@@ -1,0 +1,172 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image and Video Compression</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Image and Video Compression</h1>
+        <form id="upload-form" action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
+            <input type="file" id="file-input" name="file" accept=".jpg, .jpeg, .png, .mp4" required>
+            <button type="submit">Upload</button>
+        </form>
+        <div id="uploaded-content" style="display:none;">
+            <h2>Uploaded Content</h2>
+            <div id="content-display"></div>
+            <button id="compress-btn">Compress</button>
+        </div>
+        <div id="compressed-content" style="display:none;">
+            <h2>Compressed Content</h2>
+            <div id="compressed-display"></div>
+            <a id="download-link" href="#" download>Download</a>
+        </div>
+    </div>
+    <script>
+        document.getElementById('upload-form').onsubmit = async function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const response = await fetch(this.action, {
+                method: this.method,
+                body: formData
+            });
+            const data = await response.json();
+            const contentDisplay = document.getElementById('content-display');
+            const uploadedContent = document.getElementById('uploaded-content');
+            contentDisplay.innerHTML = '';
+            if (data.filetype === 'mp4') {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(new Blob([await fetch(data.filepath).then(res => res.blob())]));
+                video.controls = true;
+                video.width = 300;
+                contentDisplay.appendChild(video);
+            } else {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(new Blob([await fetch(data.filepath).then(res => res.blob())]));
+                img.width = 300;
+                contentDisplay.appendChild(img);
+            }
+            uploadedContent.style.display = 'block';
+            document.getElementById('compress-btn').onclick = async function() {
+                const compressResponse = await fetch('{{ url_for("compress_file") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                const compressData = await compressResponse.json();
+                const compressedDisplay = document.getElementById('compressed-display');
+                const compressedContent = document.getElementById('compressed-content');
+                const downloadLink = document.getElementById('download-link');
+                compressedDisplay.innerHTML = '';
+                if (data.filetype === 'mp4') {
+                    const compressedVideo = document.createElement('video');
+                    compressedVideo.src = compressData.compressed_path;
+                    compressedVideo.controls = true;
+                    compressedVideo.width = 300;
+                    compressedDisplay.appendChild(compressedVideo);
+                } else {
+                    const compressedImg = document.createElement('img');
+                    compressedImg.src = compressData.compressed_path;
+                    compressedImg.width = 300;
+                    compressedDisplay.appendChild(compressedImg);
+                }
+                compressedContent.style.display = 'block';
+                downloadLink.href = compressData.compressed_path;
+            };
+        };
+    </script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image and Video Compression</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        .content {
+            margin: 20px 0;
+        }
+        img, video {
+            max-width: 100%;
+            height: auto;
+            margin: 10px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 10px 0;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image and Video Compression</h1>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="file">
+            <button type="submit" class="btn">Upload</button>
+        </form>
+        
+        {% if filename %}
+        <div class="content">
+            <h2>Uploaded Content (Size: {{ filesize }})</h2>
+            {% if filename.lower().endswith(('.png', '.jpg', '.jpeg')) %}
+            <img src="{{ url_for('uploaded_file', filename=filename) }}" alt="Uploaded Image">
+            {% elif filename.lower().endswith(('.mp4', '.avi', '.mov')) %}
+            <video controls>
+                <source src="{{ url_for('uploaded_file', filename=filename) }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            {% endif %}
+            <form action="/compress" method="post">
+                <input type="hidden" name="filename" value="{{ filename }}">
+                <button type="submit" class="btn">Compress</button>
+            </form>
+        </div>
+        {% endif %}
+        
+        {% if compressed_filename %}
+        <div class="content">
+            <h2>Compressed Content (Size: {{ compressed_size }})</h2>
+            {% if compressed_filename.lower().endswith(('.png', '.jpg', '.jpeg')) %}
+            <img src="{{ url_for('compressed_file', filename=compressed_filename) }}" alt="Compressed Image">
+            {% elif compressed_filename.lower().endswith(('.mp4', '.avi', '.mov')) %}
+            <video controls>
+                <source src="{{ url_for('compressed_file', filename=compressed_filename) }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            {% endif %}
+            <a href="{{ url_for('compressed_file', filename=compressed_filename) }}" class="btn" download>Download</a>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
