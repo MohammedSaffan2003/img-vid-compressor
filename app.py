@@ -1,167 +1,137 @@
-from flask import Flask, render_template, request, send_from_directory, redirect, url_for
 import os
-from PIL import Image
-import moviepy.editor as mp
-
-# app = Flask(__name__)
-# app.config['UPLOAD_FOLDER'] = 'uploads'
-# app.config['COMPRESSED_FOLDER'] = 'compressed'
-
-# if not os.path.exists(app.config['UPLOAD_FOLDER']):
-#     os.makedirs(app.config['UPLOAD_FOLDER'])
-
-# if not os.path.exists(app.config['COMPRESSED_FOLDER']):
-#     os.makedirs(app.config['COMPRESSED_FOLDER'])
-
-# def format_size(size):
-#     for unit in ['bytes', 'KB', 'MB', 'GB']:
-#         if size < 1024:
-#             return f"{size:.2f} {unit}"
-#         size /= 1024
-#     return f"{size:.2f} TB"
-
-# @app.route('/')
-# def index():
-#     return render_template('index.html')
-
-# @app.route('/upload', methods=['POST'])
-# def upload_file():
-#     if 'file' not in request.files:
-#         return redirect(request.url)
-    
-#     file = request.files['file']
-#     if file.filename == '':
-#         return redirect(request.url)
-    
-#     if file:
-#         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-#         file.save(file_path)
-#         return render_template('index.html', filename=file.filename, filesize=format_size(os.path.getsize(file_path)))
-
-# @app.route('/uploads/<filename>')
-# def uploaded_file(filename):
-#     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-# @app.route('/compress', methods=['POST'])
-# def compress_file():
-#     filename = request.form['filename']
-#     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-#     compressed_path = os.path.join(app.config['COMPRESSED_FOLDER'], filename)
-    
-#     if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-#         image = Image.open(file_path)
-#         image.save(compressed_path, optimize=True, quality=85)
-#     elif filename.lower().endswith(('.mp4', '.avi', '.mov')):
-#         video = mp.VideoFileClip(file_path)
-#         video.write_videofile(compressed_path, bitrate="500k")
-    
-#     return render_template('index.html', filename=filename, compressed_filename=filename, filesize=format_size(os.path.getsize(file_path)), compressed_size=format_size(os.path.getsize(compressed_path)))
-
-# @app.route('/compressed/<filename>')
-# def compressed_file(filename):
-#     return send_from_directory(app.config['COMPRESSED_FOLDER'], filename)
-
-# if __name__ == '__main__':
-#     app.run(debug=True)
-
-
-
-
-from flask import Flask, render_template, request, send_file, redirect, url_for
-import os
+from flask import Flask, request, redirect, url_for, render_template, send_from_directory, send_file
 from werkzeug.utils import secure_filename
 from PIL import Image
-import cv2
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
-COMPRESSED_FOLDER = 'compressed'
+
+UPLOAD_FOLDER = 'uploads'  # Folder to store uploaded files
+COMPRESSED_FOLDER = 'compressed'  # Folder to store compressed files
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'mp4', 'avi', 'mov'}  # Allowed file extensions
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['COMPRESSED_FOLDER'] = COMPRESSED_FOLDER
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# Ensure upload and compressed folders exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(COMPRESSED_FOLDER, exist_ok=True)
 
-if not os.path.exists(COMPRESSED_FOLDER):
-    os.makedirs(COMPRESSED_FOLDER)
+def allowed_file(filename):
+    """Check if a file is allowed based on its extension."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def compress_image(image_path, output_path):
+def compress_image(image_path, output_path, quality=60):
+    """Compress an image and save it to the output path with the specified quality."""
     img = Image.open(image_path)
-    img.save(output_path, optimize=True, quality=60)
-
-def compress_video(video_path, output_path):
-    cap = cv2.VideoCapture(video_path)
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter(output_path, fourcc, 20.0, (int(cap.get(3)), int(cap.get(4))))
-
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if ret:
-            out.write(frame)
-        else:
-            break
-
-    cap.release()
-    out.release()
+    if img.mode == 'RGBA':
+        img = img.convert('RGB')  # Convert RGBA to RGB to save as JPEG
+    img.save(output_path, "JPEG", quality=quality)  # Save the image with the specified quality
 
 @app.route('/')
 def index():
+    """Render the home page."""
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    """Handle file upload and save the file to the uploads folder."""
+    if 'file' not in request.files:
+        return redirect(request.url)
     file = request.files['file']
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
-
-    file_size = os.path.getsize(file_path)
-    file_size_kb = file_size / 1024
-
-    return render_template('index.html', filename=filename, uploaded=True, file_size=file_size_kb)
+    if file.filename == '':
+        return redirect(request.url)
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        file_size = os.path.getsize(file_path) / 1024.0  # File size in KB
+        return render_template('index.html', filename=filename, uploaded=True, file_size=file_size)
+    return redirect(request.url)
 
 @app.route('/compress', methods=['POST'])
 def compress_file():
+    """Compress the uploaded file and save it to the compressed folder."""
     filename = request.form['filename']
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     compressed_file_path = os.path.join(app.config['COMPRESSED_FOLDER'], filename)
 
     if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-        compress_image(file_path, compressed_file_path)
+        compress_image(file_path, compressed_file_path)  # Compress the image
     elif filename.lower().endswith(('.mp4', '.avi', '.mov')):
-        compress_video(file_path, compressed_file_path)
+        os.system(f'ffmpeg -i {file_path} -vcodec libx264 {compressed_file_path}')  # Compress the video
 
-    compressed_file_size = os.path.getsize(compressed_file_path)
-    compressed_file_size_kb = compressed_file_size / 1024
+    compressed_size = os.path.getsize(compressed_file_path) / 1024.0  # Compressed size in KB
 
-    return render_template('index.html', filename=filename, compressed=True, compressed_filename=filename, compressed_size=compressed_file_size_kb)
+    return render_template('index.html', filename=filename, uploaded=True, file_size=os.path.getsize(file_path) / 1024.0,
+                           compressed_filename=filename, compressed=True, compressed_size=compressed_size)
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
-    return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    """Serve the uploaded file."""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/compressed/<filename>')
 def compressed_file(filename):
-    return send_file(os.path.join(app.config['COMPRESSED_FOLDER'], filename))
+    """Serve the compressed file."""
+    return send_from_directory(app.config['COMPRESSED_FOLDER'], filename)
 
 @app.route('/download/<filename>')
 def download_file(filename):
+    """Provide a download link for the compressed file."""
     compressed_file_path = os.path.join(app.config['COMPRESSED_FOLDER'], filename)
     return send_file(compressed_file_path, as_attachment=True)
 
 @app.route('/delete/<filename>', methods=['POST'])
 def delete_file(filename):
-    # Delete both the original and compressed files
-    original_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    """Delete the compressed file."""
     compressed_file_path = os.path.join(app.config['COMPRESSED_FOLDER'], filename)
-
-    if os.path.exists(original_file_path):
-        os.remove(original_file_path)
     if os.path.exists(compressed_file_path):
-        os.remove(compressed_file_path)
-
-    return redirect(url_for('index'))
+        os.remove(compressed_file_path)  # Remove the file if it exists
+    # Delete the uploaded file also if it exists
+    upload_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(upload_file_path):
+        os.remove(upload_file_path)  # Remove the file if it exists
+    return redirect('/')
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+"""
+Function Definitions and Working:
+
+1. allowed_file(filename):
+   - Purpose: Checks if the uploaded file's extension is allowed.
+   - Working: It splits the filename by the last dot and checks if the extension is in the allowed extensions.
+
+2. compress_image(image_path, output_path, quality=60):
+   - Purpose: Compresses an image using the Pillow library.
+   - Working: Opens the image from the given path, converts it to RGB if it has an alpha channel, then saves it with the specified quality to the output path.
+
+3. index():
+   - Purpose: Renders the home page.
+   - Working: Returns the index.html template.
+
+4. upload_file():
+   - Purpose: Handles file upload.
+   - Working: Checks if a file is part of the request, secures the filename, saves the file to the upload folder, and renders the template with file details.
+
+5. compress_file():
+   - Purpose: Compresses the uploaded file (image or video).
+   - Working: Depending on the file type, it compresses the image using Pillow or the video using ffmpeg, then renders the template with compressed file details.
+
+6. uploaded_file(filename):
+   - Purpose: Serves the uploaded file.
+   - Working: Sends the file from the upload directory.
+
+7. compressed_file(filename):
+   - Purpose: Serves the compressed file.
+   - Working: Sends the file from the compressed directory.
+
+8. download_file(filename):
+   - Purpose: Allows downloading of the compressed file.
+   - Working: Sends the compressed file as an attachment.
+
+9. delete_file(filename):
+   - Purpose: Deletes the compressed file.
+   - Working: Checks if the file exists and removes it, then redirects to the home page.
+"""
