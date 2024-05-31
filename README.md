@@ -2,6 +2,8 @@
 
 This project is a web application that allows users to upload and compress images (JPEG, PNG) and videos (MP4) using standard algorithms. The compressed files can then be downloaded.
 
+Visit the site - '[Click Here](https://img-vid-compressor.onrender.com/)'
+
 ## Features
 
 - Upload images and videos
@@ -20,12 +22,12 @@ This project is a web application that allows users to upload and compress image
 ## Setup
 
 1. Clone the repository:
-
+ git clone https://github.com/MohammedSaffan2003/img-vid-compressor.git
 
 2. Create a virtual environment and install dependencies:
 
 python -m venv venv
-source venv/bin/activate # On Windows use venv\Scripts\activate
+source venv/bin/activate  # On Windows use venv\Scripts\activate
 pip install -r requirements.txt
 
 
@@ -42,6 +44,4 @@ python app.py
 - Click the "Upload and Compress" button.
 - The compressed file will be available for download.
 
-## License
 
-This project is licensed under the MIT License.
